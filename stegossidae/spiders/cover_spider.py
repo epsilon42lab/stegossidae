@@ -1,23 +1,32 @@
-#from scrapy.spider import BaseSpider
-from scrapy.contrib.spiders import CrawlSpider, Rule
-from scrapy.contrib.linkextractors.sgml import SgmlLinkExtractor
+from scrapy.spiders import CrawlSpider, Rule
+from scrapy.linkextractors.sgml import SgmlLinkExtractor
 from scrapy.selector import Selector
-#from scrapy.selector import HtmlXPathSelector
 
 from stegossidae.items import StegossidaeItem
-
+import re
 
 class CoverSpider(CrawlSpider):
     name = "stego_cover"
-    allowed_domains = ["mit.edu"]
-    start_urls = ["http://mit.edu"]
-    #cover_list_file = "equalit.ie"
-    supported_extension = ["js", "pdf", "swf", "htm", "html", "jpg", "png", "gif"]
+    #allowed_domains = ["www.utoronto.ca"]
+    #start_urls = ["http://www.utoronto.ca/"]
+    # cover_list_file = "equalit.ie"
+    # supported_extension = ["js", "pdf", "swf", "htm", "html", "jpg", "png", "gif"]
+    #allowed_domains = ["funnycatpix.com"]
+    #start_urls = ["http://www.funnycatpix.com/"]
+    #allowed_domains = ["www.puppiesden.com"]
+    #start_urls = ["http://www.puppiesden.com/"]
+    allowed_domains = ["www.puppiesden.com"]
+    start_urls = ["http://www.puppiesden.com/"]
+
+    supported_extension = ["js", "htm", "html", "jpg", "png", "shtml"]
+    
     tag_to_dig = [("img", "src"), ("script", "src"), ("a","href")]
 
     rules = (Rule (SgmlLinkExtractor(),callback="parse_items", follow= True),)
              #allow=("index\d00\.html", ),restrict_xpaths=('//p[@class="nextpage"]',))
-
+    url_disector_regex = re.compile("^((http[s]?|ftp):\/)?\/?([^:\/\s]+)((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(.*)?(#[\w\-]+)?$")
+    HOST_FIELD = 3
+        
     def parse_items(self, response):
         # import pdb
         # pdb.set_trace()
@@ -28,6 +37,9 @@ class CoverSpider(CrawlSpider):
 
             #we are interested in images as well
         cur_page = StegossidaeItem()
+        if not self.url_disector_regex.match(response.url).group(self.HOST_FIELD) in self.allowed_domains:
+            return [] #we have to ignore cause we don't know what to do with local links
+
         cur_page["url"] = response.url
         items = [cur_page]
 
@@ -42,9 +54,16 @@ class CoverSpider(CrawlSpider):
                     #cur_type = url.split(".")[-1]
                     #if cur_type.lower in self.supported_extension or url.find(".") == -1: 
                     #turn relative url to absolute url
+
+                    #if there is no host then we add the host
                     if url[0] == '/' or url.find(':') == -1:
                         url_sep = (url[0] != '/') and "/" or ""
                         url = cur_page["url"][:cur_page["url"].rfind('/')]+url_sep + url
+                    else:
+                        #we check the if the host is in the allowed domain
+                        disected_url = self.url_disector_regex.match(url)
+                        if disected_url and not str(disected_url.group(self.HOST_FIELD)) in self.allowed_domains:
+                            continue
 
                     cur_item = StegossidaeItem()
                     cur_item["url"] = url.split('?')[0]
